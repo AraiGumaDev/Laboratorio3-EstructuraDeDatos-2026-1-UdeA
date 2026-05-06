@@ -7,7 +7,6 @@ public class Main {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
 
-        // ✅ CONFIGURACIÓN INICIAL
         int order = askOrder(sc);
         BTree tree = new BTree(order);
 
@@ -26,20 +25,46 @@ public class Main {
                     }
                     break;
 
-                case 2:
-                    String name = readString(sc, "Ingrese el nombre a insertar: ");
+                case 2: {
+                    String name = readNonEmptyString(sc, "Ingrese el nombre a insertar: ");
+                    System.out.println("\n=== INSERCIÓN DE \"" + name + "\" ===");
                     InsertResult result = tree.insert(name);
 
                     if (!result.inserted) {
-                        System.out.println("El nombre \"" + name + "\" ya existe.");
+                        System.out.println("El nombre \"" + name + "\" ya existe en el árbol. No se inserta (no se permiten duplicados).");
                     } else if (result.hadOverflow) {
-                        System.out.println("Inserción CON SPLIT.");
+                        System.out.println("Inserción CON SPLIT (hubo división de nodo).");
                     } else {
-                        System.out.println("Inserción NORMAL.");
+                        System.out.println("Inserción NORMAL (sin split).");
                     }
                     break;
+                }
 
-                case 3:
+                case 3: {
+                    String name = readNonEmptyString(sc, "Ingrese el nombre a buscar: ");
+                    System.out.println("\n=== BÚSQUEDA DE \"" + name + "\" ===");
+                    boolean exists = tree.search(name);
+                    if (exists) {
+                        System.out.println("El nombre \"" + name + "\" SÍ existe en el árbol.");
+                    } else {
+                        System.out.println("El nombre \"" + name + "\" NO existe en el árbol.");
+                    }
+                    break;
+                }
+
+                case 4: {
+                    String name = readNonEmptyString(sc, "Ingrese el nombre a eliminar: ");
+                    System.out.println("\n=== ELIMINACIÓN DE \"" + name + "\" ===");
+                    boolean deleted = tree.delete(name);
+                    if (deleted) {
+                        System.out.println("El nombre \"" + name + "\" fue eliminado correctamente.");
+                    } else {
+                        System.out.println("El nombre \"" + name + "\" NO existe en el árbol. Nada que eliminar.");
+                    }
+                    break;
+                }
+
+                case 5:
                     System.out.println("Saliendo...");
                     break;
 
@@ -49,12 +74,11 @@ public class Main {
 
             System.out.println();
 
-        } while (option != 3);
+        } while (option != 5);
 
         sc.close();
     }
 
-    // ✅ VALIDACIÓN OBLIGATORIA (4 - 9)
     private static int askOrder(Scanner sc) {
         int order;
         do {
@@ -75,7 +99,9 @@ public class Main {
         System.out.println("=================================");
         System.out.println("1. Visualizar árbol");
         System.out.println("2. Insertar nombre");
-        System.out.println("3. Salir");
+        System.out.println("3. Buscar nombre");
+        System.out.println("4. Eliminar nombre");
+        System.out.println("5. Salir");
     }
 
     private static int readInt(Scanner sc, String message) {
@@ -93,5 +119,12 @@ public class Main {
         System.out.print(message);
         return sc.nextLine().trim();
     }
-}
 
+    private static String readNonEmptyString(Scanner sc, String message) {
+        while (true) {
+            String value = readString(sc, message);
+            if (!value.isEmpty()) return value;
+            System.out.println("Error: el nombre no puede estar vacío.");
+        }
+    }
+}

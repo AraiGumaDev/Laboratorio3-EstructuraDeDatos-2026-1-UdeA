@@ -14,12 +14,16 @@ public class BTree {
         this.root = null;
     }
 
-    // ✅ Verificar si el árbol está vacío
     public boolean isEmpty() {
         return root == null;
     }
 
-    // ✅ Insertar nombre (String)
+    // Mínimo de claves por nodo no-raíz: ceil(m/2) - 1
+    private int minKeys() {
+        return (order + 1) / 2 - 1;
+    }
+
+    // Insertar nombre (String)
     public InsertResult insert(String key) {
 
         if (root == null) {
@@ -46,18 +50,18 @@ public class BTree {
         return new InsertResult(true, state.hadOverflow);
     }
 
-    // 🔁 Inserción recursiva
+    // Inserción recursiva
     private SplitResult insertRecursive(Node node, String key, InsertState state) {
 
         int pos = findPosition(node, key);
 
-        // ❌ evitar duplicados
+        // Evitar duplicados
         if (pos < node.keys.size() && node.keys.get(pos).equals(key)) {
             state.inserted = false;
             return null;
         }
 
-        // 🌿 Si es hoja
+        // Si es hoja
         if (node.isLeaf) {
             insertSorted(node.keys, key);
             state.inserted = true;
@@ -70,7 +74,7 @@ public class BTree {
             return null;
         }
 
-        // 🌳 Nodo interno
+        // Nodo interno
         int childIndex = findPosition(node, key);
         SplitResult childSplit = insertRecursive(node.children.get(childIndex), key, state);
 
@@ -91,7 +95,7 @@ public class BTree {
         return null;
     }
 
-    // 🔎 Encontrar posición correcta
+    // Encontrar posición correcta
     private int findPosition(Node node, String key) {
         int i = 0;
         while (i < node.keys.size() && key.compareTo(node.keys.get(i)) > 0) {
@@ -100,7 +104,7 @@ public class BTree {
         return i;
     }
 
-    // 📌 Insertar ordenado
+    // Insertar ordenado
     private void insertSorted(List<String> keys, String key) {
         int i = 0;
         while (i < keys.size() && key.compareTo(keys.get(i)) > 0) {
@@ -109,7 +113,7 @@ public class BTree {
         keys.add(i, key);
     }
 
-    // ✂️ Dividir nodo (split)
+    // Dividir nodo (split)
     private SplitResult splitNode(Node node) {
 
         int totalKeys = node.keys.size();
@@ -144,7 +148,7 @@ public class BTree {
         return new SplitResult(promotedKey, left, right);
     }
 
-    // 🌳 Imprimir árbol por niveles
+    // Imprimir árbol por niveles
     public void printByLevels() {
 
         if (root == null) {
@@ -177,5 +181,241 @@ public class BTree {
                 System.out.println();
             }
         }
+    }
+
+    // ============================================================
+    // BÚSQUEDA
+    // ============================================================
+    public boolean search(String key) {
+        if (root == null) {
+            System.out.println("    -> Árbol vacío.");
+            return false;
+        }
+        return searchRecursive(root, key, 0);
+    }
+
+    private boolean searchRecursive(Node node, String key, int level) {
+        System.out.println("    -> Nivel " + level + ": revisando " + node);
+
+        int i = 0;
+        while (i < node.keys.size() && key.compareTo(node.keys.get(i)) > 0) {
+            i++;
+        }
+
+        if (i < node.keys.size() && node.keys.get(i).equals(key)) {
+            System.out.println("    -> Encontrado en " + node + " (nivel " + level + ", posición " + i + ").");
+            return true;
+        }
+
+        if (node.isLeaf) {
+            System.out.println("    -> No encontrado: se llegó a una hoja sin coincidencia.");
+            return false;
+        }
+
+        System.out.println("    -> Bajando al hijo " + i + ".");
+        return searchRecursive(node.children.get(i), key, level + 1);
+    }
+
+    // ============================================================
+    // ELIMINACIÓN
+    // ============================================================
+    public boolean delete(String key) {
+        if (root == null) {
+            System.out.println("    -> El árbol está vacío. No hay nada que eliminar.");
+            return false;
+        }
+
+        if (!containsKey(root, key)) {
+            return false;
+        }
+
+        deleteRecursive(root, key);
+
+        if (root.keys.isEmpty()) {
+            if (root.isLeaf) {
+                System.out.println("    -> La raíz quedó vacía. El árbol ahora está vacío.");
+                root = null;
+            } else {
+                System.out.println("    -> La raíz quedó vacía tras una fusión. Su único hijo se promueve como nueva raíz.");
+                root = root.children.get(0);
+            }
+        }
+
+        return true;
+    }
+
+    // Verificar si una clave existe (solo para validar antes de borrar)
+    private boolean containsKey(Node node, String key) {
+        int i = 0;
+        while (i < node.keys.size() && key.compareTo(node.keys.get(i)) > 0) i++;
+        if (i < node.keys.size() && node.keys.get(i).equals(key)) return true;
+        if (node.isLeaf) return false;
+        return containsKey(node.children.get(i), key);
+    }
+
+    // Eliminación recursiva
+    private void deleteRecursive(Node node, String key) {
+        int pos = findPosition(node, key);
+        boolean foundHere = pos < node.keys.size() && node.keys.get(pos).equals(key);
+
+        if (foundHere) {
+            if (node.isLeaf) {
+                // CASO 1: clave en una hoja
+                System.out.println("    -> CASO 1: '" + key + "' está en la hoja " + node + ". Se elimina directamente.");
+                node.keys.remove(pos);
+                System.out.println("       Hoja resultante: " + node);
+            } else {
+                // CASO 2: clave en un nodo interno
+                deleteFromInternal(node, pos, key);
+            }
+        } else {
+            if (node.isLeaf) {
+                // No debería ocurrir porque ya validamos existencia, pero por seguridad:
+                return;
+            }
+
+            // CASO 3: la clave NO está en este nodo, hay que descender
+            int childIdx = pos;
+            if (node.children.get(childIdx).keys.size() == minKeys()) {
+                System.out.println("    -> CASO 3: el hijo " + childIdx + " " + node.children.get(childIdx)
+                        + " tiene el mínimo de claves (" + minKeys() + "). Se ajusta antes de descender.");
+                childIdx = ensureChildHasEnoughKeys(node, childIdx);
+            }
+
+            deleteRecursive(node.children.get(childIdx), key);
+        }
+    }
+
+    // Eliminar clave que está en un nodo interno
+    private void deleteFromInternal(Node node, int pos, String key) {
+        Node leftChild = node.children.get(pos);
+        Node rightChild = node.children.get(pos + 1);
+
+        if (leftChild.keys.size() > minKeys()) {
+            // CASO 2a: predecesor con claves de sobra
+            String pred = getPredecessor(leftChild);
+            System.out.println("    -> CASO 2a: '" + key + "' está en nodo interno " + node
+                    + ". El subárbol izquierdo " + leftChild + " tiene claves de sobra.");
+            System.out.println("       Se reemplaza '" + key + "' con su predecesor '" + pred + "' y se elimina '" + pred + "' recursivamente.");
+            node.keys.set(pos, pred);
+            deleteRecursive(leftChild, pred);
+
+        } else if (rightChild.keys.size() > minKeys()) {
+            // CASO 2b: sucesor con claves de sobra
+            String succ = getSuccessor(rightChild);
+            System.out.println("    -> CASO 2b: '" + key + "' está en nodo interno " + node
+                    + ". El subárbol derecho " + rightChild + " tiene claves de sobra.");
+            System.out.println("       Se reemplaza '" + key + "' con su sucesor '" + succ + "' y se elimina '" + succ + "' recursivamente.");
+            node.keys.set(pos, succ);
+            deleteRecursive(rightChild, succ);
+
+        } else {
+            // CASO 3 (fusión interna): ambos hijos del separador tienen el mínimo
+            System.out.println("    -> CASO 3 (fusión interna): '" + key + "' está en nodo interno " + node
+                    + " y ambos subárboles vecinos tienen el mínimo. Se fusionan junto con '" + key + "'.");
+            mergeChildren(node, pos);
+            System.out.println("       Nodo fusionado: " + leftChild);
+            deleteRecursive(leftChild, key);
+        }
+    }
+
+    // Predecesor: clave más a la derecha del subárbol izquierdo
+    private String getPredecessor(Node node) {
+        while (!node.isLeaf) {
+            node = node.children.get(node.children.size() - 1);
+        }
+        return node.keys.get(node.keys.size() - 1);
+    }
+
+    // Sucesor: clave más a la izquierda del subárbol derecho
+    private String getSuccessor(Node node) {
+        while (!node.isLeaf) {
+            node = node.children.get(0);
+        }
+        return node.keys.get(0);
+    }
+
+    // Asegurar que el hijo en idx tenga al menos minKeys+1 claves
+    // (redistribución desde un hermano o fusión). Devuelve el índice
+    // efectivo del hijo después del ajuste (puede cambiar si se fusionó
+    // con el hermano izquierdo).
+    private int ensureChildHasEnoughKeys(Node parent, int idx) {
+
+        Node leftSibling = (idx > 0) ? parent.children.get(idx - 1) : null;
+        Node rightSibling = (idx < parent.children.size() - 1) ? parent.children.get(idx + 1) : null;
+
+        if (leftSibling != null && leftSibling.keys.size() > minKeys()) {
+            System.out.println("       CASO 3 (redistribución): se toma prestada una clave del hermano izquierdo " + leftSibling + ".");
+            borrowFromLeft(parent, idx);
+            return idx;
+        }
+
+        if (rightSibling != null && rightSibling.keys.size() > minKeys()) {
+            System.out.println("       CASO 3 (redistribución): se toma prestada una clave del hermano derecho " + rightSibling + ".");
+            borrowFromRight(parent, idx);
+            return idx;
+        }
+
+        // Ningún hermano tiene de sobra -> fusión
+        if (rightSibling != null) {
+            System.out.println("       CASO 3 (fusión): se fusiona con el hermano derecho " + rightSibling + ".");
+            mergeChildren(parent, idx);
+            return idx;
+        } else {
+            System.out.println("       CASO 3 (fusión): se fusiona con el hermano izquierdo " + leftSibling + ".");
+            mergeChildren(parent, idx - 1);
+            return idx - 1;
+        }
+    }
+
+    // Préstamo desde el hermano izquierdo
+    private void borrowFromLeft(Node parent, int idx) {
+        Node child = parent.children.get(idx);
+        Node leftSibling = parent.children.get(idx - 1);
+
+        // Bajar la clave separadora del padre al inicio del hijo
+        child.keys.add(0, parent.keys.get(idx - 1));
+        // Subir la última clave del hermano izquierdo al padre
+        parent.keys.set(idx - 1, leftSibling.keys.remove(leftSibling.keys.size() - 1));
+
+        // Si no es hoja, mover también el último hijo del hermano
+        if (!child.isLeaf) {
+            child.children.add(0, leftSibling.children.remove(leftSibling.children.size() - 1));
+        }
+    }
+
+    // Préstamo desde el hermano derecho
+    private void borrowFromRight(Node parent, int idx) {
+        Node child = parent.children.get(idx);
+        Node rightSibling = parent.children.get(idx + 1);
+
+        // Bajar la clave separadora del padre al final del hijo
+        child.keys.add(parent.keys.get(idx));
+        // Subir la primera clave del hermano derecho al padre
+        parent.keys.set(idx, rightSibling.keys.remove(0));
+
+        // Si no es hoja, mover también el primer hijo del hermano
+        if (!child.isLeaf) {
+            child.children.add(rightSibling.children.remove(0));
+        }
+    }
+
+    // Fusionar children[idx] + parent.keys[idx] + children[idx+1]
+    private void mergeChildren(Node parent, int idx) {
+        Node left = parent.children.get(idx);
+        Node right = parent.children.get(idx + 1);
+
+        // Bajar la clave separadora al nodo izquierdo
+        left.keys.add(parent.keys.remove(idx));
+        // Mover todas las claves del derecho al izquierdo
+        left.keys.addAll(right.keys);
+
+        // Si tienen hijos, también moverlos
+        if (!left.isLeaf) {
+            left.children.addAll(right.children);
+        }
+
+        // Quitar el hijo derecho del padre
+        parent.children.remove(idx + 1);
     }
 }
