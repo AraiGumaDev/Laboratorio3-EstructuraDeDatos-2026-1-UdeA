@@ -29,7 +29,6 @@ public class BTree {
         if (root == null) {
             root = new Node(true);
             root.keys.add(key);
-            System.out.println("    -> Árbol vacío. Se crea la raíz con '" + key + "': " + root);
             return new InsertResult(true, false);
         }
 
@@ -46,7 +45,6 @@ public class BTree {
             newRoot.children.add(split.left);
             newRoot.children.add(split.right);
             root = newRoot;
-            System.out.println("    -> Se crea nueva RAÍZ: " + root);
         }
 
         return new InsertResult(true, state.hadOverflow);
@@ -65,10 +63,8 @@ public class BTree {
 
         // Si es hoja
         if (node.isLeaf) {
-            System.out.println("    -> Insertando '" + key + "' en hoja " + node + ".");
             insertSorted(node.keys, key);
             state.inserted = true;
-            System.out.println("       Hoja tras inserción: " + node);
 
             if (node.keys.size() >= order) {
                 state.hadOverflow = true;
@@ -86,11 +82,9 @@ public class BTree {
             return null;
 
         if (childSplit != null) {
-            System.out.println("    -> Subiendo clave promovida '" + childSplit.promotedKey + "' al nodo interno " + node + ".");
             node.keys.add(childIndex, childSplit.promotedKey);
             node.children.set(childIndex, childSplit.left);
             node.children.add(childIndex + 1, childSplit.right);
-            System.out.println("       Nodo interno tras absorción: " + node);
 
             if (node.keys.size() >= order) {
                 state.hadOverflow = true;
@@ -151,11 +145,6 @@ public class BTree {
             }
         }
 
-        System.out.println("    -> SPLIT: nodo " + node + " tiene " + totalKeys + " claves (orden " + order + "), desbordamiento.");
-        System.out.println("       Clave promovida: '" + promotedKey + "'");
-        System.out.println("       Nodo izquierdo: " + left);
-        System.out.println("       Nodo derecho:   " + right);
-
         return new SplitResult(promotedKey, left, right);
     }
 
@@ -202,14 +191,10 @@ public class BTree {
             System.out.println("    -> Árbol vacío.");
             return false;
         }
-        int[] visited = {0};
-        boolean found = searchRecursive(root, key, 0, visited);
-        System.out.println("    -> Nodos visitados en total: " + visited[0]);
-        return found;
+        return searchRecursive(root, key, 0);
     }
 
-    private boolean searchRecursive(Node node, String key, int level, int[] visited) {
-        visited[0]++;
+    private boolean searchRecursive(Node node, String key, int level) {
         System.out.println("    -> Nivel " + level + ": revisando " + node);
 
         int i = 0;
@@ -228,7 +213,7 @@ public class BTree {
         }
 
         System.out.println("    -> Bajando al hijo " + i + ".");
-        return searchRecursive(node.children.get(i), key, level + 1, visited);
+        return searchRecursive(node.children.get(i), key, level + 1);
     }
 
     // ============================================================
@@ -289,11 +274,12 @@ public class BTree {
                 return;
             }
 
-            // CASO 3: la clave NO está en este nodo, hay que descender
+            // La clave no está aquí: hay que descender al hijo correspondiente.
+            // Si ese hijo está en el mínimo, primero se ajusta (Caso 2a o 2b).
             int childIdx = pos;
             if (node.children.get(childIdx).keys.size() == minKeys()) {
-                System.out.println("    -> CASO 3: el hijo " + childIdx + " " + node.children.get(childIdx)
-                        + " tiene el mínimo de claves (" + minKeys() + "). Se ajusta antes de descender.");
+                System.out.println("    -> Aviso: el hijo " + childIdx + " " + node.children.get(childIdx)
+                        + " está en el mínimo (" + minKeys() + " claves). Se ajusta antes de descender.");
                 childIdx = ensureChildHasEnoughKeys(node, childIdx);
             }
 
@@ -307,27 +293,27 @@ public class BTree {
         Node rightChild = node.children.get(pos + 1);
 
         if (leftChild.keys.size() > minKeys()) {
-            // CASO 2a: predecesor con claves de sobra
+            // CASO 3 (eliminación en nodo interno): reemplazo por PREDECESOR
             String pred = getPredecessor(leftChild);
-            System.out.println("    -> CASO 2a: '" + key + "' está en nodo interno " + node
+            System.out.println("    -> CASO 3 (eliminación en nodo interno): '" + key + "' está en " + node
                     + ". El subárbol izquierdo " + leftChild + " tiene claves de sobra.");
-            System.out.println("       Se reemplaza '" + key + "' con su predecesor '" + pred + "' y se elimina '" + pred + "' recursivamente.");
+            System.out.println("       Se reemplaza '" + key + "' con su predecesor '" + pred + "' y se elimina '" + pred + "' de la hoja original.");
             node.keys.set(pos, pred);
             deleteRecursive(leftChild, pred);
 
         } else if (rightChild.keys.size() > minKeys()) {
-            // CASO 2b: sucesor con claves de sobra
+            // CASO 3 (eliminación en nodo interno): reemplazo por SUCESOR
             String succ = getSuccessor(rightChild);
-            System.out.println("    -> CASO 2b: '" + key + "' está en nodo interno " + node
+            System.out.println("    -> CASO 3 (eliminación en nodo interno): '" + key + "' está en " + node
                     + ". El subárbol derecho " + rightChild + " tiene claves de sobra.");
-            System.out.println("       Se reemplaza '" + key + "' con su sucesor '" + succ + "' y se elimina '" + succ + "' recursivamente.");
+            System.out.println("       Se reemplaza '" + key + "' con su sucesor '" + succ + "' y se elimina '" + succ + "' de la hoja original.");
             node.keys.set(pos, succ);
             deleteRecursive(rightChild, succ);
 
         } else {
-            // CASO 3 (fusión interna): ambos hijos del separador tienen el mínimo
-            System.out.println("    -> CASO 3 (fusión interna): '" + key + "' está en nodo interno " + node
-                    + " y ambos subárboles vecinos tienen el mínimo. Se fusionan junto con '" + key + "'.");
+            // CASO 3 + CASO 2b: clave en interno, ambos hijos al mínimo, se fusionan
+            System.out.println("    -> CASO 3 (eliminación en nodo interno) + CASO 2b (fusión): '" + key + "' está en " + node
+                    + " y ambos subárboles vecinos están en el mínimo. Se fusionan junto con '" + key + "'.");
             mergeChildren(node, pos);
             System.out.println("       Nodo fusionado: " + leftChild);
             deleteRecursive(leftChild, key);
@@ -360,24 +346,24 @@ public class BTree {
         Node rightSibling = (idx < parent.children.size() - 1) ? parent.children.get(idx + 1) : null;
 
         if (leftSibling != null && leftSibling.keys.size() > minKeys()) {
-            System.out.println("       CASO 3 (redistribución): se toma prestada una clave del hermano izquierdo " + leftSibling + ".");
+            System.out.println("       CASO 2a (préstamo desde el hermano izquierdo " + leftSibling + ").");
             borrowFromLeft(parent, idx);
             return idx;
         }
 
         if (rightSibling != null && rightSibling.keys.size() > minKeys()) {
-            System.out.println("       CASO 3 (redistribución): se toma prestada una clave del hermano derecho " + rightSibling + ".");
+            System.out.println("       CASO 2a (préstamo desde el hermano derecho " + rightSibling + ").");
             borrowFromRight(parent, idx);
             return idx;
         }
 
-        // Ningún hermano tiene de sobra -> fusión
+        // Ningún hermano tiene de sobra -> fusión (Caso 2b)
         if (rightSibling != null) {
-            System.out.println("       CASO 3 (fusión): se fusiona con el hermano derecho " + rightSibling + ".");
+            System.out.println("       CASO 2b (fusión con el hermano derecho " + rightSibling + ").");
             mergeChildren(parent, idx);
             return idx;
         } else {
-            System.out.println("       CASO 3 (fusión): se fusiona con el hermano izquierdo " + leftSibling + ".");
+            System.out.println("       CASO 2b (fusión con el hermano izquierdo " + leftSibling + ").");
             mergeChildren(parent, idx - 1);
             return idx - 1;
         }
