@@ -29,6 +29,7 @@ public class BTree {
         if (root == null) {
             root = new Node(true);
             root.keys.add(key);
+            System.out.println("    -> Árbol vacío. Se crea la raíz con '" + key + "': " + root);
             return new InsertResult(true, false);
         }
 
@@ -45,6 +46,7 @@ public class BTree {
             newRoot.children.add(split.left);
             newRoot.children.add(split.right);
             root = newRoot;
+            System.out.println("    -> Se crea nueva RAÍZ: " + root);
         }
 
         return new InsertResult(true, state.hadOverflow);
@@ -63,8 +65,10 @@ public class BTree {
 
         // Si es hoja
         if (node.isLeaf) {
+            System.out.println("    -> Insertando '" + key + "' en hoja " + node + ".");
             insertSorted(node.keys, key);
             state.inserted = true;
+            System.out.println("       Hoja tras inserción: " + node);
 
             if (node.keys.size() >= order) {
                 state.hadOverflow = true;
@@ -82,9 +86,11 @@ public class BTree {
             return null;
 
         if (childSplit != null) {
+            System.out.println("    -> Subiendo clave promovida '" + childSplit.promotedKey + "' al nodo interno " + node + ".");
             node.keys.add(childIndex, childSplit.promotedKey);
             node.children.set(childIndex, childSplit.left);
             node.children.add(childIndex + 1, childSplit.right);
+            System.out.println("       Nodo interno tras absorción: " + node);
 
             if (node.keys.size() >= order) {
                 state.hadOverflow = true;
@@ -145,6 +151,11 @@ public class BTree {
             }
         }
 
+        System.out.println("    -> SPLIT: nodo " + node + " tiene " + totalKeys + " claves (orden " + order + "), desbordamiento.");
+        System.out.println("       Clave promovida: '" + promotedKey + "'");
+        System.out.println("       Nodo izquierdo: " + left);
+        System.out.println("       Nodo derecho:   " + right);
+
         return new SplitResult(promotedKey, left, right);
     }
 
@@ -191,10 +202,14 @@ public class BTree {
             System.out.println("    -> Árbol vacío.");
             return false;
         }
-        return searchRecursive(root, key, 0);
+        int[] visited = {0};
+        boolean found = searchRecursive(root, key, 0, visited);
+        System.out.println("    -> Nodos visitados en total: " + visited[0]);
+        return found;
     }
 
-    private boolean searchRecursive(Node node, String key, int level) {
+    private boolean searchRecursive(Node node, String key, int level, int[] visited) {
+        visited[0]++;
         System.out.println("    -> Nivel " + level + ": revisando " + node);
 
         int i = 0;
@@ -213,7 +228,7 @@ public class BTree {
         }
 
         System.out.println("    -> Bajando al hijo " + i + ".");
-        return searchRecursive(node.children.get(i), key, level + 1);
+        return searchRecursive(node.children.get(i), key, level + 1, visited);
     }
 
     // ============================================================
